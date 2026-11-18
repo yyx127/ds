@@ -1,0 +1,360 @@
+/* ============================================================
+   sidebar.css —— 侧边栏完整样式（Step 2：UI 与列表渲染）
+   职责：
+   侧边栏容器尺寸与展开/收起动画、顶部新建对话按钮、搜索框、
+   对话历史列表项（标题/预览/时间/hover 操作按钮/置顶/高亮选中态）、
+   底部设置与清空入口。颜色全部取自 theme.css 变量，
+   间距/圆角参考 DeepSeek 官方网页风格：列表项 10px 圆角、
+   12px 左右内边距、hover 浅灰底、选中态浅蓝底。
+   ============================================================ */
+
+/* 侧边栏容器：固定宽度，纵向排布（头部 / 搜索 / 列表 / 底部） */
+.sidebar {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--sidebar-width);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-base);
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+  /* 宽度变化时的过渡动画，用于收起/展开侧边栏 */
+  transition: width var(--transition-slow), transform var(--transition-slow);
+}
+
+/* 侧边栏收起态（桌面端）：仅保留图标宽度，内部文字内容整体隐藏 */
+.sidebar.is-collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+/* 收起态下，需要隐藏的文字/搜索框/列表统一打上 .sidebar-text 标记，由 JS 切换容器的 is-collapsed 即可联动隐藏 */
+.sidebar.is-collapsed .btn-new-chat__text,
+.sidebar.is-collapsed .sidebar-search,
+.sidebar.is-collapsed .conversation-list,
+.sidebar.is-collapsed .sidebar-footer__item span:not(.icon) {
+  display: none;
+}
+
+/* 收起态下新建对话按钮收缩为纯图标方块，居中显示 */
+.sidebar.is-collapsed .btn-new-chat {
+  width: 36px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+/* 收起态下头部由横向排布改为纵向堆叠（收起按钮在上，新建按钮在下），避免挤压 */
+.sidebar.is-collapsed .sidebar-header {
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 收起态下底部入口项也居中为纯图标 */
+.sidebar.is-collapsed .sidebar-footer__item {
+  justify-content: center;
+  padding: 0;
+}
+
+/* 侧边栏头部：新建对话按钮 + 收起按钮，横向排布 */
+.sidebar-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+/* 新建对话按钮：主色填充风格，占据头部剩余空间 */
+.btn-new-chat {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn-new-chat:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-new-chat:active {
+  background-color: var(--color-primary-active);
+  transform: scale(0.98);
+}
+
+/* 搜索框容器：浅灰底圆角，内部图标 + input 横向排布 */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 0 10px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  transition: border-color var(--transition-fast);
+}
+
+.sidebar-search:focus-within {
+  border-color: var(--color-primary);
+}
+
+.sidebar-search__input {
+  flex: 1 1 auto;
+  height: 100%;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.sidebar-search__input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+/* 对话历史列表容器：纵向滚动占据侧边栏剩余空间 */
+.conversation-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 8px;
+}
+
+/* 空状态提示：居中弱化文字 */
+.conversation-list-empty {
+  text-align: center;
+  padding: 24px 12px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+/* 搜索无结果时的空状态复用同一套样式，通过独立 id/class 区分（由 JS 控制展示哪一个） */
+.conversation-list-empty--search {
+  display: none;
+}
+
+/*
+  分组标题（例如“置顶”）：弱化小字，用于在列表顶部区分置顶分组与普通分组，
+  进一步贴近 DeepSeek 官方“置顶对话单独分区展示”的习惯。
+*/
+.conversation-group-title {
+  padding: 8px 10px 4px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  user-select: none;
+}
+
+/* ---------- 对话列表项 ---------- */
+.conversation-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-primary);
+  transition: background-color var(--transition-fast);
+  /* 新增列表项出现动画：配合 JS 插入时添加的 class，淡入 + 轻微上滑 */
+  animation: ds-item-fade-in var(--transition-normal);
+}
+
+@keyframes ds-item-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.conversation-item:hover {
+  background-color: var(--color-bg-hover);
+}
+
+/* 当前选中（高亮）的对话项：浅蓝底 + 主色文字，贴近 DeepSeek 官方选中态 */
+.conversation-item.is-active {
+  background-color: var(--color-bg-active);
+  color: var(--color-primary);
+}
+
+.conversation-item.is-active .conversation-item__preview {
+  color: var(--color-primary);
+  opacity: 0.75;
+}
+
+/* 列表项主体内容区（标题 + 预览），占据除操作按钮外的剩余空间 */
+.conversation-item__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conversation-item__title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.conversation-item__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 置顶图钉小图标：显示在标题前，颜色弱化 */
+.conversation-item__pin-icon {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.conversation-item__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.conversation-item__preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-item__time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* 标题重命名输入框：默认隐藏，仅在 is-renaming 态显示，替换标题文字位置 */
+.conversation-item__rename-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  padding: 1px 4px;
+  display: none;
+}
+
+.conversation-item.is-renaming .conversation-item__rename-input {
+  display: block;
+}
+
+.conversation-item.is-renaming .conversation-item__title {
+  display: none;
+}
+
+/* 操作按钮组：默认隐藏，hover 列表项或移动端始终显示时出现 */
+.conversation-item__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.conversation-item:hover .conversation-item__actions,
+.conversation-item.is-active .conversation-item__actions,
+.conversation-item.is-menu-open .conversation-item__actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.conversation-item__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.conversation-item__action-btn .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.conversation-item__action-btn:hover {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-primary);
+}
+
+/* 删除按钮 hover 时提示危险色，强化操作预期 */
+.conversation-item__action-btn--danger:hover {
+  background-color: rgba(229, 72, 77, 0.12);
+  color: var(--color-danger);
+}
+
+/* 移动端/触屏设备：操作按钮常驻显示（没有 hover 能力），避免功能不可达 */
+@media (hover: none) {
+  .conversation-item__actions {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 侧边栏底部：设置入口 + 清理入口，纵向排布，贴底 */
+.sidebar-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-top: 1px solid var(--color-border);
+  gap: 2px;
+}
+
+.sidebar-footer__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar-footer__item:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.sidebar-footer__item .icon {
+  width: 16px;
+  height: 16px;
+}

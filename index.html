@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  DeepSeek 风格网页聊天客户端 - 页面主入口
+  纯原生 HTML + CSS + Vanilla JS 实现，不依赖任何前端框架
+  本文件只搭建静态骨架（Step 1）：
+    头部 / 左侧边栏容器 / 主聊天区容器 / 底部输入区容器
+  具体交互逻辑将在后续 Step 中逐步挂载到这些容器上
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <!--
+    viewport 设置：
+    - width=device-width：宽度跟随设备
+    - initial-scale=1.0：初始不缩放
+    - maximum-scale=1.0, user-scalable=no：禁止双击/手势放大，
+      避免移动端输入框聚焦时被系统自动缩放，破坏布局（针对 iOS Safari 重点处理）
+    - viewport-fit=cover：配合 CSS 的 safe-area-inset-*，适配刘海屏/底部小黑条
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <!-- 浏览器标签页主题色，深浅主题切换时由 JS 动态修改 -->
+  <meta name="theme-color" content="#ffffff" />
+  <!-- 禁止自动识别电话号码等，避免移动端把消息文本中的数字误渲染成可点击链接 -->
+  <meta name="format-detection" content="telephone=no" />
+  <title>DeepSeek 风格聊天客户端</title>
+
+  <!-- 第三方轻量依赖：Markdown 渲染 / 代码高亮 / 数学公式渲染（本地化，不走 CDN） -->
+  <link rel="stylesheet" href="lib/highlight/highlight.min.css" />
+  <link rel="stylesheet" href="lib/katex/katex.min.css" />
+
+  <!-- 全局样式：CSS 重置、主题变量、基础布局 -->
+  <link rel="stylesheet" href="css/reset.css" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/theme-packs.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/chat.css" />
+  <link rel="stylesheet" href="css/input.css" />
+  <link rel="stylesheet" href="css/settings.css" />
+  <link rel="stylesheet" href="css/toast.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+  <!--
+    应用根容器 #app
+    内部严格按「侧边栏 + 主聊天区」两段式横向排布，
+    输入区作为主聊天区的子容器，固定在聊天列的底部
+  -->
+  <div id="app" class="app">
+
+    <!-- ========== 移动端遮罩层：抽屉式侧边栏展开时覆盖主区域，点击可关闭侧边栏 ========== -->
+    <div id="sidebar-overlay" class="sidebar-overlay" hidden></div>
+
+    <!-- ========== 左侧边栏容器 ========== -->
+    <aside id="sidebar" class="sidebar">
+      <!-- 侧边栏头部：新建对话按钮 + 导入文件按钮 + 收起/展开按钮 -->
+      <div id="sidebar-header" class="sidebar-header">
+        <!-- 收起/展开侧边栏按钮 -->
+        <button id="btn-collapse-sidebar" class="icon-btn" type="button" aria-label="收起侧边栏">
+          <span class="icon" data-icon="collapse"></span>
+        </button>
+        <!-- 新建对话按钮 -->
+        <button id="btn-new-chat" class="btn-new-chat" type="button" aria-label="新建对话">
+          <span class="icon" data-icon="plus"></span>
+          <span class="btn-new-chat__text">新建对话</span>
+        </button>
+        <!-- 导入文件：读取外部长文本/聊天记录，自动压缩生成摘要后作为新对话的开场背景 -->
+        <button id="btn-import-file" class="icon-btn" type="button" aria-label="导入文件">
+          <span class="icon" data-icon="upload"></span>
+        </button>
+        <input id="import-file-picker" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+      </div>
+
+      <!-- 对话搜索框容器 -->
+      <div id="sidebar-search" class="sidebar-search">
+        <span class="icon" data-icon="search"></span>
+        <input id="input-search-conv" class="sidebar-search__input" type="text" placeholder="搜索历史对话" autocomplete="off" />
+      </div>
+
+      <!-- 对话历史列表容器：具体列表项由 JS 动态渲染插入 -->
+      <nav id="conversation-list" class="conversation-list" aria-label="对话历史列表">
+        <!-- 占位：无任何对话时的空状态提示，由 JS 按实际数据显示/隐藏 -->
+        <div id="conversation-list-empty" class="conversation-list-empty">
+          暂无历史对话
+        </div>
+        <!-- 占位：搜索无匹配结果时的空状态提示，由 JS 按搜索结果显示/隐藏 -->
+        <div id="conversation-list-empty-search" class="conversation-list-empty conversation-list-empty--search">
+          没有找到匹配的对话
+        </div>
+      </nav>
+
+      <!-- 侧边栏底部：设置入口 + 清理入口 -->
+      <div id="sidebar-footer" class="sidebar-footer">
+        <button id="btn-open-settings" class="sidebar-footer__item" type="button">
+          <span class="icon" data-icon="settings"></span>
+          <span>设置</span>
+        </button>
+        <button id="btn-clear-all" class="sidebar-footer__item" type="button">
+          <span class="icon" data-icon="trash"></span>
+          <span>清空对话</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ========== 主体区域：顶部工具条 + 聊天区 + 输入区 ========== -->
+    <main id="main-panel" class="main-panel">
+
+      <!-- 顶部工具条：移动端汉堡菜单、当前对话标题、压缩上下文按钮等占位 -->
+      <header id="main-header" class="main-header">
+        <button id="btn-open-sidebar-mobile" class="icon-btn icon-btn--mobile-only" type="button" aria-label="打开侧边栏">
+          <span class="icon" data-icon="menu"></span>
+        </button>
+        <div id="main-header-title" class="main-header__title">新对话</div>
+        <!-- 清空当前对话：仅清空本对话的消息记录，不删除对话条目本身（与侧边栏“清空对话”清空全部不同） -->
+        <button id="btn-clear-current-chat" class="icon-btn" type="button" aria-label="清空当前对话消息" title="清空当前对话消息">
+          <span class="icon" data-icon="trash"></span>
+        </button>
+        <button id="btn-compress-context" class="btn-compress" type="button" title="手动压缩上下文">
+          <span class="icon" data-icon="compress"></span>
+          <span class="btn-compress__text">压缩上下文</span>
+        </button>
+      </header>
+
+      <!-- 压缩状态条：显示当前对话（当前分支）的 token 占用与压缩情况，点压缩按钮时
+           原地切换为进度展示；不存在消息时由 JS 隐藏整条，不占地方 -->
+      <div id="compress-status-bar" class="compress-status-bar" hidden>
+        <div id="compress-status-bar__info" class="compress-status-bar__info"></div>
+        <div id="compress-status-bar__progress" class="compress-status-bar__progress" hidden>
+          <span class="icon" data-icon="compress"></span>
+          <span id="compress-status-bar__progress-text">正在压缩…</span>
+        </div>
+      </div>
+
+      <!-- 主聊天消息区：消息气泡列表容器，具体消息由 JS 渲染插入 -->
+      <section id="chat-area" class="chat-area">
+        <!-- 会话独立背景图层：绝对定位铺满聊天区，位于消息列表之下；
+             由 js/core/conversation-backgrounds.js 按当前会话动态设置背景图与滤镜，
+             无背景时保持空白，不遮挡消息气泡 -->
+        <div id="chat-background" class="chat-background" aria-hidden="true"></div>
+        <!-- 消息列表滚动容器 -->
+        <div id="message-list" class="message-list">
+          <!-- 空状态欢迎引导页容器：新建对话 / 当前对话无消息时展示 -->
+          <div id="empty-state" class="empty-state">
+            <!-- 萌萌小鲸鱼图标：扁平矢量风格，圆滚滚身体 + 大圆眼 + 俏皮微笑 + 头顶喷水浪花，
+                 浅蓝柔和配色，放在浅灰白圆形底色里；配色是鲸鱼本身的"人设色"，
+                 不跟随主题变量（避免深色模式下被染成别的颜色，失去治愈萌感），
+                 只有外层圆形底色跟随主题浅/深背景变化 -->
+            <div class="empty-state__logo" aria-hidden="true">
+              <svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <!-- 身体：圆滚滚的水滴形，浅蓝色主体 -->
+                <path
+                  d="M12 34c0-13 9.5-21 20-21s19 7 21.5 16c.6-1.6 1-3.4 1-5 2 2.5 2 6-.3 9 1 .2 2 0 2.8-.7-.5 3-3 5-6 5.3-3.6 6-11.5 10.4-19 10.4-13 0-20-6-20-14z"
+                  fill="#AEE0F2"
+                />
+                <!-- 肚皮：稍浅的蓝白色椭圆，叠加在身体下半部分，增加层次但不增加杂色 -->
+                <path
+                  d="M15 37c2 6.5 9 11 18 11 6 0 11.5-2.3 15-6-3 1.3-6.8 2-11 2-11 0-19-3-22-7z"
+                  fill="#E4F6FC"
+                />
+                <!-- 头顶喷水浪花：三滴圆润水滴叠成一小团，同样走浅蓝色系，不引入第三种色相 -->
+                <circle cx="27" cy="9" r="3.2" fill="#AEE0F2" />
+                <circle cx="22" cy="12.5" r="2.4" fill="#AEE0F2" />
+                <circle cx="32" cy="12" r="2.2" fill="#AEE0F2" />
+                <!-- 大圆眼：白底 + 深色瞳孔 + 小高光点，圆润可爱 -->
+                <circle cx="24" cy="30" r="5.4" fill="#FFFFFF" />
+                <circle cx="25" cy="31" r="3" fill="#355C73" />
+                <circle cx="26.6" cy="29.3" r="1" fill="#FFFFFF" />
+                <!-- 俏皮微笑：一道上扬的弧线 -->
+                <path
+                  d="M19 39c2.5 2.6 6 3.6 9.5 2.6"
+                  stroke="#355C73"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  fill="none"
+                />
+                <!-- 腮红：两颊各一个很浅的小圆点，增添"萌"的气质但不抢色 -->
+                <circle cx="15.5" cy="34" r="2" fill="#FFD9E0" opacity="0.7" />
+              </svg>
+            </div>
+            <!-- 欢迎语：每次空状态出现时由 chat.js 从一组文案里随机挑一句填入，不是固定文字 -->
+            <div id="empty-state-greeting" class="empty-state__greeting"></div>
+          </div>
+        </div>
+
+        <!-- 滚动到底部悬浮按钮占位：用户上滑后出现 -->
+        <button id="btn-scroll-bottom" class="btn-scroll-bottom" type="button" hidden aria-label="滚动到底部">
+          <span class="icon" data-icon="arrow-down"></span>
+        </button>
+      </section>
+
+      <!-- ========== 底部输入区容器 ==========
+           结构重构说明：取消原来「input-area > input-area__inner > input-box」
+           三层套娃；现在 input-area 本身就是居中限宽的容器（宽度限制直接写在
+           input-area 上），input-card 是唯一一张"卡片"，工具条（附件/深度思考）
+           直接作为卡片内的第一行，文本框 + 发送按钮是第二行，不再额外嵌套一层
+           只为了撑一个圆角背景的无意义容器。附件预览条、状态栏作为卡片外的
+           独立次要信息行，视觉上明确从属于卡片但不挤在同一个边框里。 -->
+      <footer id="input-area" class="input-area">
+        <!-- 待发送附件预览条：选择文件后在这里展示缩略图/文件名，发送后清空；默认无内容时隐藏 -->
+        <div id="draft-attachments" class="draft-attachments" hidden></div>
+
+        <!-- 输入卡片：唯一的圆角边框容器，工具条与文本框/发送按钮都是它的直接子行 -->
+        <div id="input-card" class="input-card">
+          <!-- 工具条行：附件按钮 + 深度思考开关，作为卡片内的第一行 -->
+          <div id="input-toolbar" class="input-toolbar">
+            <button id="btn-attach" class="icon-btn" type="button" aria-label="添加附件">
+              <span class="icon" data-icon="attach"></span>
+            </button>
+            <!-- 真实的文件选择输入框：隐藏显示，由 btn-attach 触发点击；
+                 accept 不限制类型，具体能否随消息发送由 attachments.js 按模型能力把关 -->
+            <input id="input-file-picker" type="file" multiple hidden />
+            <button id="btn-toggle-thinking" class="toggle-thinking" type="button" aria-pressed="false">
+              <span class="icon" data-icon="thinking"></span>
+              <span>深度思考</span>
+            </button>
+          </div>
+
+          <!-- 文本框 + 发送按钮行：卡片内的第二行，自动增高文本框由 JS 动态设置高度 -->
+          <div id="input-box" class="input-box">
+            <textarea
+              id="textarea-message"
+              class="input-box__textarea"
+              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+              rows="1"
+            ></textarea>
+            <!-- 发送 / 停止按钮：根据生成状态由 JS 切换图标与行为 -->
+            <button id="btn-send" class="btn-send" type="button" aria-label="发送消息">
+              <span class="icon" data-icon="send"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 底部状态栏：预估 Token 数 + 当前模型名，卡片外的次要信息行 -->
+        <div id="status-bar" class="status-bar">
+          <span id="status-token-estimate" class="status-bar__item">预估 Token：0</span>
+          <span id="status-model-name" class="status-bar__item">模型：未配置</span>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- ========== 设置面板弹窗容器（占位，Step 后续实现内容与交互） ========== -->
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal__mask" id="settings-modal-mask"></div>
+    <div class="modal__panel settings-panel" role="dialog" aria-modal="true" aria-label="设置">
+      <!-- 具体设置内容由后续 Step 填充 -->
+    </div>
+  </div>
+
+  <!-- ========== 全局 Toast 提示容器（占位，Step 后续实现） ========== -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- ========== 第三方依赖脚本：本地化引入，先于业务脚本加载 ========== -->
+  <script src="lib/marked/marked.min.js"></script>
+  <script src="lib/highlight/highlight.min.js"></script>
+  <script src="lib/katex/katex.min.js"></script>
+
+  <!--
+    ============================================================
+    业务脚本加载顺序说明：
+    必须严格按「配置 -> 工具 -> 核心 -> API -> 功能模块 -> 入口」顺序加载，
+    因为后续模块会直接使用前面模块挂在 window 上的全局命名空间对象，
+    原生 JS 无模块打包，脚本顺序即依赖顺序。
+    Step 2 新增接入：图标工具、格式化工具、Toast、确认弹窗、
+    侧边栏假数据与侧边栏交互模块。
+    ============================================================
+  -->
+  <script src="js/config/config.js"></script>
+
+  <!-- 工具层 -->
+  <script src="js/utils/icons.js"></script>
+  <script src="js/utils/format.js"></script>
+
+  <!-- 核心基础设施层 -->
+  <script src="js/core/toast.js"></script>
+  <script src="js/core/confirm-dialog.js"></script>
+  <!-- 消息分支树核心算法：移植自 deepseek-ai/chat-demo 官方实现，供 chat.js / sidebar.js 调用 -->
+  <script src="js/core/branches.js"></script>
+  <script src="js/core/user-config.js"></script>
+  <!-- 主题引擎：深浅色切换 + 配色包 + 自定义配色，应用到 html 的 data-theme* 属性 -->
+  <script src="js/core/theme.js"></script>
+  <!-- 轻量 IndexedDB 封装：供需要存较大二进制数据的模块使用 -->
+  <script src="js/core/db.js"></script>
+  <!-- 会话独立背景图 + 滤镜：依赖 js/core/db.js -->
+  <script src="js/core/conversation-backgrounds.js"></script>
+  <!-- 对话与消息的真实本地持久化：依赖 js/core/db.js，供 sidebar.js / chat.js 调用 -->
+  <script src="js/core/conversation-store.js"></script>
+  <!-- 压缩引擎配置：阈值/保留比例等本地可调参数 -->
+  <script src="js/core/compression-settings.js"></script>
+  <!-- 按对话保存的压缩记录（不改动原始消息，只影响发给模型的请求体） -->
+  <script src="js/core/compression-records.js"></script>
+
+  <!-- API 适配层（Step 5：通用请求模块，不绑定任何厂商，所有可配置项从 DSUserConfig 读取） -->
+  <script src="js/api/api-client.js"></script>
+
+  <!-- 对话上下文压缩引擎：算法移植自 DeepSeek Harness 官方 compaction 实现，依赖 js/api/api-client.js 发起摘要请求 -->
+  <script src="js/core/compression.js"></script>
+
+  <!-- 功能模块层：侧边栏（Step 2：假数据 + UI 交互） -->
+  <script src="js/modules/sidebar/mock-data.js"></script>
+  <script src="js/modules/sidebar/sidebar.js"></script>
+  <!-- 导入文件：依赖 sidebar.js 的 createConversationWithMessages 与 compression.js -->
+  <script src="js/modules/sidebar/import-file.js"></script>
+
+  <!-- 功能模块层：设置面板（Step 5：仅 API 设置分区，供 API 适配层读取配置） -->
+  <script src="js/modules/settings/settings.js"></script>
+
+  <!-- 功能模块层：聊天区渲染工具库（Markdown/代码高亮/公式/消息 DOM 构建，纯函数，不持有状态） -->
+  <script src="js/modules/chat/chat-demo.js"></script>
+
+  <!-- 功能模块层：聊天区状态管理（Step 5：已对接通用 API 适配层，支持流式/非流式、思考渲染、错误处理、停止生成） -->
+  <script src="js/modules/chat/chat.js"></script>
+
+  <!-- 功能模块层：附件选择与本地预览（真实可用：点击附件按钮选择文件、缩略图预览、发送前能力把关） -->
+  <script src="js/modules/input/attachments.js"></script>
+
+  <!-- 功能模块层：输入栏（发送/停止已对接 chat.js 的本地消息状态管理） -->
+  <script src="js/modules/input/input.js"></script>
+
+  <!-- 入口 -->
+  <script src="js/main.js"></script>
+</body>
+</html>

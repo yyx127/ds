@@ -1,0 +1,720 @@
+/* ============================================================
+   chat.css —— 主聊天区完整样式（Step 3：消息气泡 / 思考面板 / 加载动画）
+   职责：
+   消息气泡（用户靠右蓝色 / AI 靠左白色）、深度思考折叠面板、
+   三点加载动效、流式光标、消息操作按钮、Markdown 内容排版、
+   空状态欢迎引导页的完整视觉实现。
+   颜色全部取自 theme.css 变量，气泡圆角/间距/字号参考 DeepSeek 官方风格。
+   ============================================================ */
+
+/* ---------- 会话独立背景图层 ---------- */
+/*
+  绝对定位铺满 .chat-area（其 position: relative 已在 layout.css 中设置），
+  z-index: 0 让它永远在消息列表（默认 z-index: auto，但晚于本元素出现在 DOM 中，
+  自然层叠在上方）之下；transform: scale(1.06) 配合 filter: blur() 使用，
+  避免模糊后图片边缘出现半透明的露白缝隙（这是 filter: blur 的常见副作用，
+  把容器略微放大一点裁切掉模糊晕开的边缘即可）。
+  具体 background-image / filter 的值由 js/core/conversation-backgrounds.js
+  按当前会话的背景设置动态写入 style，本文件只提供容器定位与裁切。
+*/
+.chat-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: scale(1.06);
+  transition: opacity var(--transition-slow);
+}
+
+/* 消息列表需要显式置于背景之上，并保留自身的透明背景色不被背景图透穿过度干扰文字可读性 */
+.message-list {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 空状态欢迎引导页 ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 24px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+/* 萌萌小鲸鱼图标：扁平多色矢量插画（身体/眼睛/腮红用固定的"人设色"，不随主题换色，
+   保持治愈萌感的辨识度），外层圆形底色改为固定的淡蓝白渐变（不用 --color-bg-hover，
+   那个变量是全局中性灰，会让底色看起来脏灰而不是"蓝白"），同样不随主题切换，
+   和鲸鱼本身的浅蓝配色呼应统一；轻微上下漂浮动效呼应海洋氛围，幅度很小不干扰阅读；
+   prefers-reduced-motion 下自动关闭（见文件末尾的全局无障碍规则） */
+.empty-state__logo {
+  width: 92px;
+  height: 92px;
+  padding: 14px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #eaf6fc 0%, #f7fcff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-elevated);
+  animation: ds-whale-float 4.5s ease-in-out infinite;
+}
+
+@keyframes ds-whale-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* 欢迎语：每次空状态出现时随机换一句的短文案，字号克制，不抢图标的视觉重心 */
+.empty-state__greeting {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* ---------- 压缩上下文按钮（顶部工具条内） ---------- */
+.btn-compress {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  background-color: var(--color-bg-elevated);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-compress:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+
+.btn-compress .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* 压缩进行中：按钮禁用态 + 图标旋转动画，给用户明确的"正在处理"反馈 */
+.btn-compress:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.btn-compress.is-compressing .icon {
+  animation: ds-compress-spin 1s linear infinite;
+}
+
+@keyframes ds-compress-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 压缩状态条：挂在对话界面顶部工具条下方，不用跳设置就能看到当前
+   分支的压缩情况；没有消息时整条隐藏，点压缩按钮时原地切成进度展示 ---------- */
+.compress-status-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-bg-elevated);
+}
+
+.compress-status-bar__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.compress-status-bar__info strong {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.compress-status-bar__progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary);
+}
+
+.compress-status-bar__progress .icon {
+  width: 13px;
+  height: 13px;
+  animation: ds-compress-spin 1s linear infinite;
+}
+
+/* ---------- 消息列表整体排布 ---------- */
+.message-list {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px 12px;
+}
+
+/* 单条消息外层容器：纵向堆叠，上下留出消息间距（对齐 DeepSeek 官方的舒适留白） */
+.message-row {
+  display: flex;
+  margin-bottom: 22px;
+  /* 消息出现动画：淡入 + 轻微上移，柔和不突兀 */
+  animation: ds-msg-fade-in var(--transition-slow);
+}
+
+@keyframes ds-msg-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 用户消息：整行内容靠右 */
+.message-row--user {
+  justify-content: flex-end;
+}
+
+/* AI 消息：整行内容靠左 */
+.message-row--assistant {
+  justify-content: flex-start;
+}
+
+/* 消息内容纵向容器（气泡 + 操作按钮栏），限制最大宽度避免长消息占满整行 */
+.message-col {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.message-row--user .message-col {
+  align-items: flex-end;
+  max-width: 78%;
+}
+
+.message-row--assistant .message-col {
+  align-items: flex-start;
+  max-width: 88%;
+}
+
+/* ---------- 消息气泡本体 ---------- */
+.message-bubble {
+  border-radius: var(--radius-lg);
+  font-size: 15px;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+/* 用户气泡：蓝色填充、白字，右上角略小圆角制造“发出去”的方向感 */
+.message-row--user .message-bubble {
+  background-color: var(--color-bubble-user);
+  color: var(--color-text-on-primary);
+  padding: 10px 16px;
+  border-top-right-radius: 4px;
+}
+
+/* AI 气泡：白底（深色模式下为深灰），无边框阴影，贴近 DeepSeek 简洁风格；左上角略小圆角 */
+.message-row--assistant .message-bubble {
+  background-color: var(--color-bubble-ai);
+  color: var(--color-text-primary);
+  padding: 2px 0;
+  border-top-left-radius: 4px;
+}
+
+/* AI 消息在窄屏/大屏下的内容区左右留白，用户消息因为是色块气泡所以自带 padding，这里仅给 AI 消息文本流一个基础内边距 */
+.message-row--assistant .message-bubble {
+  padding: 4px 2px;
+}
+
+/* 用户消息纯文本内容容器：保留换行，避免用户输入的换行丢失 */
+.message-bubble__text {
+  white-space: pre-wrap;
+}
+
+/* ---------- 深度思考折叠面板 ---------- */
+.thinking-panel {
+  width: 100%;
+  margin-bottom: 10px;
+  border: 1px solid var(--color-thinking-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-thinking-bg);
+  overflow: hidden;
+  transition: background-color var(--transition-fast);
+}
+
+/* 思考面板头部：点击可展开/收起，左侧灯泡图标 + 文案，右侧箭头指示方向 */
+.thinking-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  color: var(--color-thinking-text);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.thinking-panel__header .icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.thinking-panel__title {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+/* 展开/收起箭头：默认指向右（收起态），展开后旋转 90 度指向下 */
+.thinking-panel__arrow {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.thinking-panel.is-expanded .thinking-panel__arrow {
+  transform: rotate(90deg);
+}
+
+/* 思考内容区：默认收起（高度 0 且隐藏），展开后显示完整内容 */
+.thinking-panel__body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-slow);
+}
+
+.thinking-panel.is-expanded .thinking-panel__body {
+  /* 使用较大的 max-height 兜底，允许内容自然撑开；思考内容一般不会超过此高度，
+     若后续真实场景内容更长，可配合 JS 动态设置 scrollHeight 实现精确动画，
+     这里为纯 UI Step 采用简化方案，不影响视觉效果 */
+  max-height: 2000px;
+}
+
+.thinking-panel__content {
+  padding: 0 12px 12px 34px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-thinking-text);
+  white-space: pre-wrap;
+  border-top: 1px solid var(--color-thinking-border);
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
+/* ---------- 加载中三点动效（AI 回复前） ---------- */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+}
+
+.loading-dots__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-text-tertiary);
+  animation: ds-dot-bounce 1.2s infinite ease-in-out;
+}
+
+.loading-dots__dot:nth-child(1) {
+  animation-delay: 0s;
+}
+.loading-dots__dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.loading-dots__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ds-dot-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* 流式输出跳动光标：紧跟在逐字渲染文本末尾 */
+.stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background-color: var(--color-primary);
+  animation: ds-cursor-blink 0.9s steps(1) infinite;
+}
+
+@keyframes ds-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- 消息操作按钮栏（复制/重新生成/点赞点踩/编辑） ---------- */
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+/* 桌面端 hover 消息行时显示操作按钮；移动端常驻显示（无 hover 能力） */
+.message-row:hover .message-actions,
+.message-row.is-actions-pinned .message-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .message-actions {
+    opacity: 1;
+  }
+}
+
+.message-actions__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.message-actions__btn .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.message-actions__btn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* 点赞/点踩被选中后的高亮态（占位交互，Step 3 仅做视觉切换） */
+.message-actions__btn.is-selected {
+  color: var(--color-primary);
+}
+
+/* ---------- 分支切换器："‹ 1/3 ›" 样式，切换重新生成/编辑产生的多个版本 ----------
+   与 .message-actions 不同：只要存在多个版本就常驻显示，不依赖 hover，
+   因为"这条消息还有别的版本"是需要用户随时能注意到的真实状态，不是次要操作。 */
+.branch-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.branch-switcher__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--color-text-tertiary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.branch-switcher__btn .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.branch-switcher__btn:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.branch-switcher__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.branch-switcher__count {
+  min-width: 32px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 用户消息编辑态 ---------- */
+.message-edit-box {
+  width: 100%;
+  min-width: 260px;
+}
+
+.message-edit-box__textarea {
+  width: 100%;
+  min-height: 60px;
+  max-height: 300px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.message-edit-box__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.message-edit-box__btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  font-size: 12.5px;
+  transition: background-color var(--transition-fast);
+}
+
+.message-edit-box__btn--cancel {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.message-edit-box__btn--cancel:hover {
+  background-color: var(--color-border-strong);
+}
+
+.message-edit-box__btn--save {
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.message-edit-box__btn--save:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* ---------- Markdown 内容排版（气泡内正文） ---------- */
+.markdown-body p {
+  margin: 0 0 10px;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.markdown-body li {
+  margin-bottom: 4px;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.markdown-body h1 {
+  font-size: 1.4em;
+}
+.markdown-body h2 {
+  font-size: 1.25em;
+}
+.markdown-body h3 {
+  font-size: 1.12em;
+}
+.markdown-body h4 {
+  font-size: 1.02em;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-hover);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.markdown-body table {
+  width: 100%;
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.markdown-body th {
+  background-color: var(--color-bg-hover);
+  font-weight: 600;
+}
+
+.markdown-body a {
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+.markdown-body img {
+  border-radius: var(--radius-sm);
+  margin: 6px 0;
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 14px 0;
+}
+
+/* 行内代码 */
+.markdown-body code {
+  font-family: var(--font-family-mono);
+  font-size: 0.88em;
+  background-color: var(--color-code-bg);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* 代码块容器：包裹 pre + 复制按钮 + 语言标签 */
+.code-block {
+  position: relative;
+  margin: 0 0 12px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+}
+
+.code-block__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background-color: var(--color-bg-hover);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.code-block__lang {
+  font-family: var(--font-family-mono);
+  text-transform: lowercase;
+}
+
+.code-block__copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.code-block__copy-btn:hover {
+  background-color: var(--color-bg-active);
+  color: var(--color-text-primary);
+}
+
+.code-block__copy-btn .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-block code {
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* KaTeX 公式块：块级公式左右留白，避免贴边 */
+.markdown-body .katex-display {
+  margin: 10px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---------- 滚动到底部悬浮按钮 ---------- */
+.btn-scroll-bottom {
+  position: absolute;
+  right: 50%;
+  transform: translateX(50%);
+  bottom: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+  z-index: 10;
+}
+
+.btn-scroll-bottom:hover {
+  background-color: var(--color-bg-hover);
+}

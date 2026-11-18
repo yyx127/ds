@@ -1,0 +1,177 @@
+/* ============================================================
+   layout.css —— 页面整体骨架布局
+   职责：只负责「侧边栏 + 主聊天区」的整体排布、全屏占满、
+   Safari / iOS 安全区适配等结构性样式。
+   具体侧边栏内部、聊天气泡、输入框等细节样式分别在各自文件中定义。
+   ============================================================ */
+
+/* body 应用基础字体、行高、颜色、背景，并撑满视口 */
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-base);
+  /* 主题切换时背景色/文字色过渡更柔和 */
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+  /*
+    iOS Safari 专用修复：
+    使用 100vh 在 iOS Safari 下会因地址栏动态收起/展开导致页面跳动，
+    这里改用 100% 配合 html,body height:100%（reset.css 已设置），
+    外层通过 dvh（动态视口高度，现代 Safari 支持）做进一步兼容。
+  */
+  height: 100%;
+}
+
+/* 支持 dvh 的浏览器使用动态视口高度，避免移动端地址栏伸缩导致布局跳动 */
+@supports (height: 100dvh) {
+  body {
+    height: 100dvh;
+  }
+}
+
+/* 应用根容器：Flex 横向排布，左侧边栏 + 右主区域，撑满整个 body */
+.app {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /*
+    安全区适配：顶部与左右留出刘海屏/圆角屏安全区域，
+    底部安全区交由输入区单独处理（因为输入区贴底，需要把安全区变成实际 padding）
+  */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  box-sizing: border-box;
+}
+
+/* 移动端侧边栏展开时的遮罩层：覆盖主区域，点击可收起侧边栏 */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: var(--z-sidebar-overlay);
+  /* 默认通过 hidden 属性隐藏，这里补充过渡动画用的透明度基础值 */
+  opacity: 1;
+  transition: opacity var(--transition-normal);
+}
+
+/* 主体区域：占据除侧边栏外的全部空间，内部纵向排布（顶部工具条 + 聊天区 + 输入区） */
+.main-panel {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-main);
+  overflow: hidden;
+}
+
+/* 顶部工具条：固定高度，内部横向排布（移动端菜单按钮 / 标题 / 压缩按钮） */
+.main-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-bg-main);
+}
+
+/* 标题占据中间剩余空间，超长省略 */
+.main-header__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-primary);
+}
+
+/* 聊天消息区域：占据主区域除顶部工具条与底部输入区之外的全部剩余空间 */
+.chat-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 消息列表容器：纵向滚动，预留左右内边距保证大屏下内容不贴边 */
+.message-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Safari 下的弹性滚动，体验更接近原生 */
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 0 12px;
+}
+
+/* 底部输入区容器：始终贴在主聊天列底部，不参与消息列表滚动 */
+.input-area {
+  flex: 0 0 auto;
+  background-color: var(--color-bg-main);
+  /*
+    底部安全区适配：iPhone 底部小黑条场景下，把安全区高度转换为实际内边距，
+    避免输入框被系统手势条遮挡
+  */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 自定义滚动条样式（Webkit 内核：Chrome / Edge / Safari 均生效） */
+.message-list::-webkit-scrollbar,
+.conversation-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.message-list::-webkit-scrollbar-thumb,
+.conversation-list::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar);
+  border-radius: var(--radius-full);
+}
+
+.message-list::-webkit-scrollbar-thumb:hover,
+.conversation-list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-scrollbar-hover);
+}
+
+/* ---------- 通用图标按钮基础样式（具体图标内容后续通过 data-icon 配合背景/伪元素或 SVG 注入） ---------- */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.icon-btn:active {
+  transform: scale(0.94);
+}
+
+/* 图标占位基础样式：Step 1 暂不引入 SVG 图标集，先用占位尺寸撑住布局 */
+.icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+/* 仅移动端显示的元素（如汉堡菜单按钮），桌面端默认隐藏，断点在 responsive.css 中定义 */
+.icon-btn--mobile-only {
+  display: none;
+}

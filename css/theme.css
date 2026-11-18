@@ -1,0 +1,194 @@
+/* ============================================================
+   theme.css —— 主题变量定义（浅色 / 深色 双主题）
+   设计说明：
+   - 所有颜色值统一用 CSS 变量声明，业务样式文件只消费变量，不写死色值，
+     这样切换主题只需要切换 html 标签上的 data-theme 属性即可。
+   - 色值参考 DeepSeek 官方网页配色风格：
+     主色为蓝紫色系 (#4d6bfe)，浅色背景以白/浅灰为主，深色背景以深灰/墨黑为主。
+   - 跟随系统主题通过 prefers-color-scheme 媒体查询实现，
+     当 data-theme="system" 时，由 JS 读取系统偏好后动态写入实际 data-theme，
+     这里同时提供媒体查询兜底（JS 未执行前的首屏闪烁兜底）。
+   ============================================================ */
+
+/* ---------- 浅色主题（默认） ---------- */
+:root,
+html[data-theme="light"] {
+  /* 品牌主色：按钮、高亮、选中态、链接等关键交互色 */
+  --color-primary: #4d6bfe;
+  --color-primary-hover: #3f5aea;
+  --color-primary-active: #3449c8;
+  /* 主色的浅色衬底（如用户消息气泡背景、选中背景） */
+  --color-primary-soft: #e8edff;
+
+  /* 页面最底层背景色（侧边栏背景） */
+  --color-bg-base: #f7f7f8;
+  /* 主聊天区背景色 */
+  --color-bg-main: #ffffff;
+  /* 卡片 / 弹窗 / 输入框容器背景色 */
+  --color-bg-elevated: #ffffff;
+  /* 悬浮态背景色（列表项 hover） */
+  --color-bg-hover: #ececef;
+  /* 激活/选中态背景色（当前对话高亮） */
+  --color-bg-active: #e9ecff;
+  /* AI 消息气泡背景色 */
+  --color-bubble-ai: #ffffff;
+  /* 用户消息气泡背景色（蓝色系） */
+  --color-bubble-user: #4d6bfe;
+
+  /* 主要文字颜色 */
+  --color-text-primary: #1f2024;
+  /* 次要文字颜色（时间戳、预览文本、占位说明） */
+  --color-text-secondary: #6b6f76;
+  /* 第三级文字颜色（更弱提示，禁用态文字） */
+  --color-text-tertiary: #9a9da3;
+  /* 用户气泡内文字颜色（深色背景上用白字） */
+  --color-text-on-primary: #ffffff;
+  /* 链接颜色 */
+  --color-link: #4d6bfe;
+
+  /* 边框 / 分割线颜色 */
+  --color-border: #e5e5e7;
+  --color-border-strong: #d7d8db;
+
+  /* 功能色：成功 / 警告 / 错误 / 信息（Toast、状态提示复用） */
+  --color-success: #2fb344;
+  --color-warning: #e8a53d;
+  --color-danger: #e5484d;
+  --color-info: #4d6bfe;
+
+  /* 深度思考折叠面板专用配色（浅灰底、细边框，区别于普通气泡） */
+  --color-thinking-bg: #f5f6f8;
+  --color-thinking-border: #e5e5e7;
+  --color-thinking-text: #6b6f76;
+
+  /* 代码块背景（浅色主题下代码块使用浅灰底，配合 highlight.js github 主题） */
+  --color-code-bg: #f6f8fa;
+
+  /* 阴影：弹窗、悬浮卡片的投影，统一走变量方便深色模式调整透明度 */
+  --shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.16);
+
+  /* 滚动条颜色（Webkit 内核，Safari/Chrome/Edge 均支持） */
+  --color-scrollbar: rgba(0, 0, 0, 0.15);
+  --color-scrollbar-hover: rgba(0, 0, 0, 0.28);
+}
+
+/* ---------- 深色主题 ---------- */
+html[data-theme="dark"] {
+  --color-primary: #4d6bfe;
+  --color-primary-hover: #6680ff;
+  --color-primary-active: #3f5aea;
+  --color-primary-soft: #26305e;
+
+  --color-bg-base: #1c1c1e;
+  --color-bg-main: #212124;
+  --color-bg-elevated: #2a2a2d;
+  --color-bg-hover: #323336;
+  --color-bg-active: #2d3557;
+  --color-bubble-ai: #2a2a2d;
+  --color-bubble-user: #4d6bfe;
+
+  --color-text-primary: #ededef;
+  --color-text-secondary: #9a9da3;
+  --color-text-tertiary: #6b6f76;
+  --color-text-on-primary: #ffffff;
+  --color-link: #7c93ff;
+
+  --color-border: #3a3a3d;
+  --color-border-strong: #48484c;
+
+  --color-success: #3fcf56;
+  --color-warning: #f0b556;
+  --color-danger: #f0696d;
+  --color-info: #7c93ff;
+
+  --color-thinking-bg: #26262a;
+  --color-thinking-border: #3a3a3d;
+  --color-thinking-text: #9a9da3;
+
+  --color-code-bg: #1a1a1c;
+
+  --shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.5);
+
+  --color-scrollbar: rgba(255, 255, 255, 0.15);
+  --color-scrollbar-hover: rgba(255, 255, 255, 0.28);
+}
+
+/*
+  跟随系统主题兜底：
+  当 html 标签没有显式 data-theme（即 JS 尚未来得及写入，或用户选择了“跟随系统”
+  且 JS 直接保留 data-theme="system"）时，根据系统偏好套用对应色值。
+  正式生效逻辑仍以 JS 中 theme 模块动态写入具体 light/dark 为准，这里只做首屏闪烁兜底。
+*/
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] {
+    --color-primary: #4d6bfe;
+    --color-primary-hover: #6680ff;
+    --color-primary-active: #3f5aea;
+    --color-primary-soft: #26305e;
+
+    --color-bg-base: #1c1c1e;
+    --color-bg-main: #212124;
+    --color-bg-elevated: #2a2a2d;
+    --color-bg-hover: #323336;
+    --color-bg-active: #2d3557;
+    --color-bubble-ai: #2a2a2d;
+    --color-bubble-user: #4d6bfe;
+
+    --color-text-primary: #ededef;
+    --color-text-secondary: #9a9da3;
+    --color-text-tertiary: #6b6f76;
+    --color-text-on-primary: #ffffff;
+    --color-link: #7c93ff;
+
+    --color-border: #3a3a3d;
+    --color-border-strong: #48484c;
+
+    --color-thinking-bg: #26262a;
+    --color-thinking-border: #3a3a3d;
+    --color-thinking-text: #9a9da3;
+
+    --color-code-bg: #1a1a1c;
+
+    --shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.4);
+    --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.5);
+
+    --color-scrollbar: rgba(255, 255, 255, 0.15);
+    --color-scrollbar-hover: rgba(255, 255, 255, 0.28);
+  }
+}
+
+/* ---------- 全局通用基础样式：字体族、过渡时长变量 ---------- */
+:root {
+  /* 字体族：优先使用系统默认 UI 字体，中英文混排效果最佳，且 Safari/iOS 渲染清晰 */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* 代码等宽字体族 */
+  --font-family-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+    Courier, monospace;
+
+  /* 基础字号与行高：对齐 DeepSeek 官方正文阅读体验（14px 正文 + 1.6 行高） */
+  --font-size-base: 15px;
+  --line-height-base: 1.6;
+
+  /* 统一过渡时长与缓动函数，全局柔和动画效果 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 侧边栏宽度（展开态 / 收起态），供布局与动画共用 */
+  --sidebar-width: 260px;
+  --sidebar-width-collapsed: 64px;
+
+  /* 圆角规范：气泡、卡片、按钮分级使用 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* z-index 分层管理，避免弹窗/遮罩/吐司层级混乱 */
+  --z-sidebar-overlay: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+}

@@ -1,0 +1,101 @@
+/* ============================================================
+   theme-packs.css —— 多套配色包 + 自定义配色支持
+   ============================================================
+   设计说明：
+   - 深浅色的「结构性」变量（背景分层、文字层级、边框、阴影等）仍由 theme.css 的
+     [data-theme="light"/"dark"] 负责，本文件不重复定义，只负责在深浅色基础之上
+     再叠加一层「主色调配色包」：改变主色（--color-primary 系）、用户气泡色、
+     选中态背景色这几个最能代表"整体色彩氛围"的变量，叠加后两者互不冲突。
+   - 选择器用 [data-theme-scheme] 而不是 [data-theme]：data-theme 在"跟随系统"
+     模式下的值是字面上的 "system"（供 theme.css 的媒体查询兜底规则识别），
+     并不是具体的 light/dark，如果本文件也用 [data-theme="dark"] 选择器，
+     跟随系统且系统恰好是深色时配色包会完全匹配不上。
+     theme.js 会在任何模式下都额外写入 data-theme-scheme="light"/"dark"
+     这个表示"当前真正生效的深浅色"的属性，本文件统一基于它来选择配色包。
+   - 命名全部直接用色相本身（黑色/深蓝/墨绿/深紫/白色/浅蓝/薄荷绿/浅粉），
+     不使用诗意化的营销名称，按要求保持直白。
+   - 自定义配色（用户在设置面板里用拾色器调出的任意色值）通过 JS 直接把
+     --color-primary 等变量写到 html 的 style 上（行内样式优先级最高，
+     天然覆盖本文件里任何 [data-theme-pack] 的预设值），本文件不需要为
+     "自定义" 专门写一套选择器。
+   ============================================================ */
+
+/* ---------- 深色组：黑色（默认深色，与 theme.css 的 dark 基础色一致，这里显式声明方便统一管理） ---------- */
+html[data-theme-scheme="dark"][data-theme-pack="black"] {
+  --color-primary: #4d6bfe;
+  --color-primary-hover: #6680ff;
+  --color-primary-active: #3f5aea;
+  --color-primary-soft: #26305e;
+  --color-bubble-user: #4d6bfe;
+  --color-bg-active: #2d3557;
+}
+
+/* ---------- 深色组：深蓝 ---------- */
+html[data-theme-scheme="dark"][data-theme-pack="navy-blue"] {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #5b9bff;
+  --color-primary-active: #2f6bdb;
+  --color-primary-soft: #1d2f55;
+  --color-bubble-user: #3b82f6;
+  --color-bg-active: #203259;
+}
+
+/* ---------- 深色组：墨绿 ---------- */
+html[data-theme-scheme="dark"][data-theme-pack="dark-green"] {
+  --color-primary: #35b579;
+  --color-primary-hover: #4fd194;
+  --color-primary-active: #2a9a64;
+  --color-primary-soft: #16332a;
+  --color-bubble-user: #2f9d6c;
+  --color-bg-active: #1b3a2e;
+}
+
+/* ---------- 深色组：深紫 ---------- */
+html[data-theme-scheme="dark"][data-theme-pack="dark-purple"] {
+  --color-primary: #9168f0;
+  --color-primary-hover: #a888f5;
+  --color-primary-active: #7c52d8;
+  --color-primary-soft: #2c2347;
+  --color-bubble-user: #8a63e8;
+  --color-bg-active: #2e2650;
+}
+
+/* ---------- 浅色组：白色（默认浅色，与 theme.css 的 light 基础色一致） ---------- */
+html[data-theme-scheme="light"][data-theme-pack="white"] {
+  --color-primary: #4d6bfe;
+  --color-primary-hover: #3f5aea;
+  --color-primary-active: #3449c8;
+  --color-primary-soft: #e8edff;
+  --color-bubble-user: #4d6bfe;
+  --color-bg-active: #e9ecff;
+}
+
+/* ---------- 浅色组：浅蓝 ---------- */
+html[data-theme-scheme="light"][data-theme-pack="light-blue"] {
+  --color-primary: #2f8fe0;
+  --color-primary-hover: #1f7dcb;
+  --color-primary-active: #1a6bb0;
+  --color-primary-soft: #e4f1fc;
+  --color-bubble-user: #2f8fe0;
+  --color-bg-active: #e1effa;
+}
+
+/* ---------- 浅色组：薄荷绿 ---------- */
+html[data-theme-scheme="light"][data-theme-pack="mint-green"] {
+  --color-primary: #2bab7e;
+  --color-primary-hover: #249470;
+  --color-primary-active: #1d7c5e;
+  --color-primary-soft: #e3f6ee;
+  --color-bubble-user: #2bab7e;
+  --color-bg-active: #e0f4ec;
+}
+
+/* ---------- 浅色组：浅粉 ---------- */
+html[data-theme-scheme="light"][data-theme-pack="light-pink"] {
+  --color-primary: #e2669b;
+  --color-primary-hover: #cc5588;
+  --color-primary-active: #b34575;
+  --color-primary-soft: #fdebf2;
+  --color-bubble-user: #e2669b;
+  --color-bg-active: #fbe8f0;
+}

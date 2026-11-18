@@ -1,0 +1,186 @@
+/* ============================================================
+   reset.css —— 全局 CSS 重置
+   目的：消除不同浏览器（尤其 Safari / iOS Safari）的默认样式差异，
+   为后续精确还原 DeepSeek 官方视觉效果打好统一基础。
+   ============================================================ */
+
+/* 盒模型统一为 border-box，宽高计算包含 padding 与 border，避免布局计算混乱 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 清除所有元素默认的外边距、内边距，避免浏览器默认 UA 样式影响自定义布局 */
+html,
+body,
+div,
+span,
+header,
+footer,
+main,
+section,
+aside,
+nav,
+ul,
+ol,
+li,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+button,
+textarea,
+input,
+form,
+figure,
+blockquote,
+table,
+th,
+td {
+  margin: 0;
+  padding: 0;
+}
+
+/* html / body 撑满整个视口高度，为三段式全屏布局做准备 */
+html,
+body {
+  height: 100%;
+  /* 禁止 iOS Safari 下拉出现橡皮筋回弹背景露白，配合 body overflow 控制 */
+  overscroll-behavior: none;
+}
+
+/*
+  根元素字号采用相对单位基准，便于后续用 rem 做整体缩放（本项目主要用 px，
+  这里保留标准基准避免某些浏览器默认 16px 以外的异常值）
+*/
+html {
+  font-size: 16px;
+  /* 修复 iOS Safari 横屏旋转后页面文字被系统自动放大的问题 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* body 默认不允许横向滚动，纵向滚动交由内部各容器自行处理 */
+body {
+  overflow: hidden;
+  /* 去除移动端点击元素时出现的半透明灰色高亮遮罩（iOS/Android 通用问题） */
+  -webkit-tap-highlight-color: transparent;
+  /* 关闭长按弹出系统菜单对关键交互按钮的干扰（文本区域会单独允许选择） */
+  -webkit-touch-callout: none;
+}
+
+/* 列表默认去掉项目符号，统一由业务样式控制 */
+ul,
+ol {
+  list-style: none;
+}
+
+/* 链接默认样式清除，颜色与下划线交由具体场景样式控制 */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 图片默认块级展示并限制最大宽度，避免溢出容器 */
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* 按钮重置：清除系统默认外观、边框、背景，统一由业务 class 控制视觉 */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  /* 去除 iOS Safari 按钮默认的圆角与渐变外观 */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 禁用状态下按钮鼠标指针与透明度统一处理 */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 输入控件重置：字体继承、外观清除，避免 Safari 的默认内阴影/圆角 */
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  /* iOS Safari 下输入框默认会有圆角和内阴影，这里统一清除 */
+  border-radius: 0;
+}
+
+/* textarea 默认允许纵向拖拽调整大小，这里关闭，由 JS 控制自动增高逻辑 */
+textarea {
+  resize: none;
+}
+
+/* 占位符颜色统一交由主题变量控制，此处仅重置默认透明度行为 */
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+}
+
+/* 表格边框合并，避免默认双边框间隙影响 Markdown 表格渲染效果 */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* 统一所有可交互元素的焦点可见性由业务样式接管，避免 Safari 默认蓝色外框与自定义风格冲突 */
+:focus {
+  outline: none;
+}
+
+/* 保留键盘可访问性：当用户通过键盘 Tab 聚焦时恢复可见焦点环，兼顾无障碍需求；
+   文本输入框（input/textarea）排除在外——这类元素聚焦后本身就有原生文字光标闪烁
+   作为"当前可输入"的提示，再叠加一圈外框只会显得多余，与"无双层边框"的极简要求冲突 */
+:focus-visible:not(textarea):not(input) {
+  outline: 2px solid var(--color-primary, #4d6bfe);
+  outline-offset: 2px;
+}
+
+/*
+  【关键修复】全局兜底 [hidden] 规则：
+  浏览器原生给 [hidden] 属性的默认样式是 UA 样式表里优先级很低的 display: none，
+  任何业务 class 选择器（如 .modal { display: flex }、.sidebar-overlay 的 position:fixed 规则）
+  一旦同时命中该元素，都会覆盖掉这个默认隐藏效果，导致元素即使带着 hidden 属性仍然占满屏幕、
+  照常接收点击——这正是“弹窗/遮罩层在未打开状态下仍然拦截整页点击”的根本原因。
+  这里用 !important 在全局最早加载的 reset.css 里统一兜底，确保无论后续任何模块给元素加了
+  多强的 display/position 规则，只要还带着 hidden 属性，就必须彻底从页面布局与点击响应中移除。
+  同时补一条 pointer-events: none 双重保险：即使某处意外用 JS 直接操作 style.display
+  绕过了 hidden 属性判断，没有指针事件也不会再拦截下层元素的点击。
+*/
+[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/*
+  无障碍：用户在系统层面开启"减弱动态效果"时，关闭所有装饰性动画/过渡
+  （鲸鱼漂浮、消息出现动画、过渡缓动等），只保留功能必需的视觉反馈，
+  避免对动态效果敏感的用户产生不适，同时也顺带省电。
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
